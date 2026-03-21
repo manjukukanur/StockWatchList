@@ -4,10 +4,10 @@ import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/aut
 import { collection, doc, setDoc, onSnapshot, query, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { Search, Plus, Trash2, TrendingUp, TrendingDown, LogOut, User as UserIcon, Loader2, X, RefreshCw } from 'lucide-react';
+import { Search, Plus, Trash2, TrendingUp, TrendingDown, LogOut, User as UserIcon, Loader2, X, RefreshCw, ExternalLink, Calendar, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { fetchStockData, searchStocks } from './services/stockService';
-import { StockData, WatchlistItem } from './types';
+import { fetchStockData, searchStocks, fetchStockDetails } from './services/stockService';
+import { StockData, WatchlistItem, NewsItem } from './types';
 import { StockChart } from './components/StockChart';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -34,6 +34,8 @@ export default function App() {
   const [stockDetails, setStockDetails] = useState<Record<string, StockData>>({});
   const [isLoadingDetails, setIsLoadingDetails] = useState<Record<string, boolean>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
+  const [isFetchingFullDetails, setIsFetchingFullDetails] = useState(false);
 
   // Firestore Watchlist
   const watchlistRef = useMemo(() => {
@@ -115,6 +117,18 @@ export default function App() {
       console.error('Search error:', err);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleStockClick = async (symbol: string) => {
+    setIsFetchingFullDetails(true);
+    try {
+      const details = await fetchStockDetails(symbol);
+      setSelectedStock(details);
+    } catch (err) {
+      console.error('Error fetching full stock details:', err);
+    } finally {
+      setIsFetchingFullDetails(false);
     }
   };
 
@@ -299,11 +313,15 @@ export default function App() {
                     key={item.symbol}
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative"
+                    onClick={() => handleStockClick(item.symbol)}
+                    className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative cursor-pointer"
                   >
                     <button
-                      onClick={() => removeFromWatchlist(item.symbol)}
-                      className="absolute top-4 right-4 p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromWatchlist(item.symbol);
+                      }}
+                      className="absolute top-4 right-4 p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 z-10"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -350,6 +368,153 @@ export default function App() {
           )}
         </section>
       </main>
+
+      {/* Full Details Modal */}
+      <AnimatePresence>
+        {selectedStock && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="p-8 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-4xl font-bold text-slate-900 tracking-tight">{selectedStock.symbol}</h2>
+                    <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full uppercase tracking-wider">
+                      {selectedStock.currency}
+                    </span>
+                  </div>
+                  <p className="text-xl text-slate-500 font-medium">{selectedStock.name}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedStock(null)}
+                  className="p-3 text-slate-400 hover:text-slate-600 hover:bg-white rounded-2xl transition-all shadow-sm"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-8 space-y-10">
+                {/* Key Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Price</p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {getCurrencySymbol(selectedStock.currency)}{selectedStock.price.toLocaleString()}
+                    </p>
+                    <div className={cn(
+                      "flex items-center gap-1 text-sm font-bold mt-1",
+                      selectedStock.change >= 0 ? "text-emerald-600" : "text-rose-600"
+                    )}>
+                      {selectedStock.change >= 0 ? '+' : ''}{selectedStock.change.toFixed(2)} ({selectedStock.changePercent.toFixed(2)}%)
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Market Cap</p>
+                    <p className="text-2xl font-bold text-slate-900">{selectedStock.marketCap || 'N/A'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">P/E Ratio</p>
+                    <p className="text-2xl font-bold text-slate-900">{selectedStock.peRatio || 'N/A'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Div Yield</p>
+                    <p className="text-2xl font-bold text-slate-900">{selectedStock.dividendYield || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {/* Chart Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-indigo-600" />
+                      Price Movement (30 Days)
+                    </h3>
+                    <div className="flex gap-4 text-sm font-medium">
+                      <div className="flex flex-col items-end">
+                        <span className="text-slate-400 text-[10px] uppercase tracking-tighter">52W High</span>
+                        <span className="text-slate-900">{getCurrencySymbol(selectedStock.currency)}{selectedStock.high52w?.toLocaleString() || 'N/A'}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-slate-400 text-[10px] uppercase tracking-tighter">52W Low</span>
+                        <span className="text-slate-900">{getCurrencySymbol(selectedStock.currency)}{selectedStock.low52w?.toLocaleString() || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+                    <StockChart 
+                      data={selectedStock.history} 
+                      color={selectedStock.change >= 0 ? "#10b981" : "#f43f5e"} 
+                    />
+                  </div>
+                </div>
+
+                {/* News Section */}
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Info className="w-5 h-5 text-indigo-600" />
+                    Latest News
+                  </h3>
+                  <div className="grid gap-4">
+                    {selectedStock.news && selectedStock.news.length > 0 ? (
+                      selectedStock.news.map((news, idx) => (
+                        <a
+                          key={idx}
+                          href={news.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group bg-white border border-slate-100 p-6 rounded-3xl hover:border-indigo-200 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-widest">
+                              <Calendar className="w-3 h-3" />
+                              {news.date}
+                            </div>
+                            <h4 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug">
+                              {news.title}
+                            </h4>
+                            <p className="text-slate-500 text-sm line-clamp-2 leading-relaxed">
+                              {news.summary}
+                            </p>
+                          </div>
+                          <ExternalLink className="w-5 h-5 text-slate-300 group-hover:text-indigo-600 transition-colors shrink-0" />
+                        </a>
+                      ))
+                    ) : (
+                      <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-slate-400 italic">
+                        No recent news found for this stock.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Loading Overlay for full details */}
+      <AnimatePresence>
+        {isFetchingFullDetails && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-white/80 backdrop-blur-md"
+          >
+            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-200 mb-6 animate-pulse">
+              <TrendingUp className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Fetching Market Insights</h3>
+            <p className="text-slate-500 animate-pulse">Analyzing real-time data and news...</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

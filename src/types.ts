@@ -13,6 +13,13 @@ export interface WatchlistItem {
   addedAt: any; // Firestore Timestamp
 }
 
+export interface NewsItem {
+  title: string;
+  summary: string;
+  url: string;
+  date: string;
+}
+
 export interface StockData {
   symbol: string;
   name: string;
@@ -21,4 +28,10 @@ export interface StockData {
   change: number;
   changePercent: number;
   history: { date: string; price: number }[];
+  news?: NewsItem[];
+  marketCap?: string;
+  peRatio?: number;
+  dividendYield?: string;
+  high52w?: number;
+  low52w?: number;
 }

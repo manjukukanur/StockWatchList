@@ -3,6 +3,60 @@ import { StockData } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
+export async function fetchStockDetails(symbol: string): Promise<StockData> {
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `Search the web for the latest, real-time stock market data for ${symbol}. Provide the current price, currency, price change, percentage change, a 30-day price history (date and price), market cap, P/E ratio, dividend yield, 52-week high, 52-week low, and the latest 3 news items (title, summary, url, date). Return the data in JSON format.`,
+    config: {
+      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          symbol: { type: Type.STRING },
+          name: { type: Type.STRING },
+          price: { type: Type.NUMBER },
+          currency: { type: Type.STRING },
+          change: { type: Type.NUMBER },
+          changePercent: { type: Type.NUMBER },
+          marketCap: { type: Type.STRING },
+          peRatio: { type: Type.NUMBER },
+          dividendYield: { type: Type.STRING },
+          high52w: { type: Type.NUMBER },
+          low52w: { type: Type.NUMBER },
+          history: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                date: { type: Type.STRING },
+                price: { type: Type.NUMBER }
+              },
+              required: ["date", "price"]
+            }
+          },
+          news: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                summary: { type: Type.STRING },
+                url: { type: Type.STRING },
+                date: { type: Type.STRING }
+              },
+              required: ["title", "summary", "url", "date"]
+            }
+          }
+        },
+        required: ["symbol", "name", "price", "currency", "change", "changePercent", "history", "news"]
+      }
+    }
+  });
+
+  const data = JSON.parse(response.text || "{}");
+  return data as StockData;
+}
 export async function fetchStockData(symbol: string): Promise<StockData> {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
