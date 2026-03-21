@@ -43,7 +43,7 @@ export async function fetchStockData(symbol: string): Promise<StockData> {
 export async function searchStocks(query: string): Promise<{ symbol: string; name: string }[]> {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Search for stock symbols matching "${query}". Return a list of up to 5 matching stocks with their symbol and full company name. Return the data in JSON format.`,
+    contents: `Search for stock symbols matching "${query}". Return a list of up to 10 matching stocks with their symbol and full company name. Return the data in JSON format.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
