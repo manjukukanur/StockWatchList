@@ -16,6 +16,16 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function getCurrencySymbol(currency: string) {
+  switch (currency?.toUpperCase()) {
+    case 'INR': return '₹';
+    case 'GBP': return '£';
+    case 'EUR': return '€';
+    case 'JPY': return '¥';
+    default: return '$';
+  }
+}
+
 export default function App() {
   const [user, loading, error] = useAuthState(auth);
   const [searchQuery, setSearchQuery] = useState('');
@@ -305,7 +315,9 @@ export default function App() {
                       </div>
                       {details && (
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-slate-900">${details.price.toLocaleString()}</div>
+                          <div className="text-2xl font-bold text-slate-900">
+                            {getCurrencySymbol(details.currency)}{details.price.toLocaleString()}
+                          </div>
                           <div className={cn(
                             "flex items-center justify-end gap-1 text-sm font-semibold",
                             details.change >= 0 ? "text-emerald-600" : "text-rose-600"

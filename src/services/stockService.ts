@@ -6,7 +6,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 export async function fetchStockData(symbol: string): Promise<StockData> {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Search the web for the latest, real-time stock market data for ${symbol}. Provide the current price, price change, percentage change, and a 7-day price history (date and price). Return the data in JSON format.`,
+    contents: `Search the web for the latest, real-time stock market data for ${symbol}. Provide the current price, the currency of the price (e.g., USD, INR), price change, percentage change, and a 7-day price history (date and price). Return the data in JSON format.`,
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
@@ -16,6 +16,7 @@ export async function fetchStockData(symbol: string): Promise<StockData> {
           symbol: { type: Type.STRING },
           name: { type: Type.STRING },
           price: { type: Type.NUMBER },
+          currency: { type: Type.STRING, description: "The currency code, e.g., USD or INR" },
           change: { type: Type.NUMBER },
           changePercent: { type: Type.NUMBER },
           history: {
@@ -30,7 +31,7 @@ export async function fetchStockData(symbol: string): Promise<StockData> {
             }
           }
         },
-        required: ["symbol", "name", "price", "change", "changePercent", "history"]
+        required: ["symbol", "name", "price", "currency", "change", "changePercent", "history"]
       }
     }
   });

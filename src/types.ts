@@ -17,6 +17,7 @@ export interface StockData {
   symbol: string;
   name: string;
   price: number;
+  currency: string;
   change: number;
   changePercent: number;
   history: { date: string; price: number }[];
