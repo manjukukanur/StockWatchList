@@ -1,0 +1,5 @@
+{
+  "name": "StockWatch",
+  "description": "A personal stock watchlist app with Google authentication and real-time insights.",
+  "requestFramePermissions": []
+}

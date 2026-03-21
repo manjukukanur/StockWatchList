@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required) - The unique ID of the user.
+    //   - email: string (required, email format) - The user's email address.
+    //   - displayName: string (optional) - The user's display name.
+    //   - photoURL: string (optional) - The user's profile picture URL.
+    //   - createdAt: timestamp (required) - When the profile was created.
+    //
+    // Collection: /users/{userId}/watchlist/{symbol}
+    // Document ID: {symbol}
+    // Fields:
+    //   - userId: string (required) - The ID of the user who owns this item.
+    //   - symbol: string (required) - The stock ticker symbol (e.g., AAPL).
+    //   - name: string (optional) - The full name of the company.
+    //   - addedAt: timestamp (required) - When the stock was added to the watchlist.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidWatchlistItem(data, userId) {
+      return hasOnlyAllowedFields(['userId', 'symbol', 'name', 'addedAt']) &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.symbol is string && data.symbol.size() > 0 && data.symbol.size() <= 10 &&
+             data.addedAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.uid == resource.data.uid;
+
+      match /watchlist/{symbol} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidWatchlistItem(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
